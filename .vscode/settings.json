@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "stm32f10x.h": "c",
+        "cstdio": "cpp"
+    },
+    "files.encoding": "gb2312",
+    "editor.detectIndentation": false,
+    "editor.tabSize": 4,
+    "C_Cpp.errorSquiggles": "Disabled"
+}
