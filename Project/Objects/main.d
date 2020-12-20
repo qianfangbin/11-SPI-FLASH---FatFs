@@ -32,3 +32,6 @@
 .\objects\main.o: ..\User\usart\bsp_usart.h
 .\objects\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 .\objects\main.o: ..\User\spi_flash\bsp_spi_flash.h
+.\objects\main.o: ..\User\fatfs\ff.h
+.\objects\main.o: ..\User\fatfs\integer.h
+.\objects\main.o: ..\User\fatfs\ffconf.h

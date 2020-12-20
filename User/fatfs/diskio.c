@@ -8,14 +8,12 @@
 /*-----------------------------------------------------------------------*/
 
 #include "diskio.h"		/* FatFs lower layer API */
-#include "usbdisk.h"	/* Example: Header file of existing USB MSD control module */
-#include "atadrive.h"	/* Example: Header file of existing ATA harddisk control module */
-#include "sdcard.h"		/* Example: Header file of existing MMC/SDC contorl module */
+#include "ff.h"
+#include "bsp_spi_flash.h"
 
 /* Definitions of physical drive number for each drive */
-#define ATA		0	/* Example: Map ATA harddisk to physical drive 0 */
-#define MMC		1	/* Example: Map MMC/SD card to physical drive 1 */
-#define USB		2	/* Example: Map USB MSD to physical drive 2 */
+#define ATA		        0	/* reserve for SD card */
+#define SPI_FLASH		1	/* fro spi flash on board */
 
 
 /*-----------------------------------------------------------------------*/
@@ -26,34 +24,32 @@ DSTATUS disk_status (
 	BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
-	DSTATUS stat;
-	int result;
+	DSTATUS stat = STA_NOINIT;
+	//int result;
 
 	switch (pdrv) {
 	case ATA :
-		result = ATA_disk_status();
+        /*SD CARD*/
+		      break;
 
-		// translate the reslut code here
+	case SPI_FLASH :
+        if(SPI_FLASH_ReadJedecDeviceID() == W25_FLASH_ID)
+        {
+            stat &= ~STA_NOINIT;    // device ID check pass, return 0
 
-		return stat;
+        }
+        else
+        {
+            stat = STA_NOINIT;  // ID check fail, return 1
+        }
+        break;
+    default:
+        stat = STA_NOINIT;
+        break;
 
-	case MMC :
-		result = MMC_disk_status();
-
-		// translate the reslut code here
-
-		return stat;
-
-	case USB :
-		result = USB_disk_status();
-
-		// translate the reslut code here
-
-		return stat;
 	}
-	return STA_NOINIT;
+	return stat;
 }
-
 
 
 /*-----------------------------------------------------------------------*/
@@ -64,32 +60,29 @@ DSTATUS disk_initialize (
 	BYTE pdrv				/* Physical drive nmuber to identify the drive */
 )
 {
-	DSTATUS stat;
-	int result;
+	DSTATUS stat = STA_NOINIT;
+	//int result;
+    uint16_t i;
 
 	switch (pdrv) {
 	case ATA :
-		result = ATA_disk_initialize();
+        /*SD CARD*/
+		      break;
 
-		// translate the reslut code here
+	case SPI_FLASH :
+		SPI_FLASH_Init();
+        i = 500;
+        while(--i);
+        SPI_FLASH_WakeUp();
+        stat = disk_status(SPI_FLASH);
+        break;
 
-		return stat;
+    default:
+        stat = STA_NOINIT;
+        break;
 
-	case MMC :
-		result = MMC_disk_initialize();
-
-		// translate the reslut code here
-
-		return stat;
-
-	case USB :
-		result = USB_disk_initialize();
-
-		// translate the reslut code here
-
-		return stat;
 	}
-	return STA_NOINIT;
+	return stat;
 }
 
 
@@ -102,42 +95,29 @@ DRESULT disk_read (
 	BYTE pdrv,		/* Physical drive nmuber to identify the drive */
 	BYTE *buff,		/* Data buffer to store read data */
 	DWORD sector,	/* Sector address in LBA */
-	UINT count		/* Number of sectors to read */
+	UINT count		/* Number of sectors to read  max = 2MBYTE/4096 = 512 */
 )
 {
-	DRESULT res;
-	int result;
+	DRESULT res = RES_PARERR;
+	//int result;
 
 	switch (pdrv) {
 	case ATA :
-		// translate the arguments here
+		/*SD CARD*/
+		      break;
 
-		result = ATA_disk_read(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
-
-	case MMC :
-		// translate the arguments here
-
-		result = MMC_disk_read(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
-
-	case USB :
-		// translate the arguments here
-
-		result = USB_disk_read(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
+	case SPI_FLASH :
+        SPI_FLASH_BufferRead(buff, sector<<12, count<<12);  // sector size = 4096 = 2^12 bytes
+        res = RES_OK;
+        break;
+		
+    default:
+        res = RES_PARERR;
+        break;
+	
 	}
 
-	return RES_PARERR;
+	return res;
 }
 
 
@@ -154,40 +134,29 @@ DRESULT disk_write (
 	UINT count			/* Number of sectors to write */
 )
 {
-	DRESULT res;
-	int result;
+	DRESULT res = RES_PARERR;
+	//int result;
 
 	switch (pdrv) {
 	case ATA :
-		// translate the arguments here
+		/*SD CARD*/
+		      break;
 
-		result = ATA_disk_write(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
-
-	case MMC :
-		// translate the arguments here
-
-		result = MMC_disk_write(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
-
-	case USB :
-		// translate the arguments here
-
-		result = USB_disk_write(buff, sector, count);
-
-		// translate the reslut code here
-
-		return res;
+	case SPI_FLASH :
+        SPI_FLASH_SectorErase(sector<<12);  //make sure erase operation before write
+        SPI_FLASH_BufferWrite((uint8_t *)buff, sector<<12, count<<12);  // sector size = 4096 = 2^12 bytes
+        res = RES_OK;
+        break;
+		
+    default:
+        res = RES_PARERR;
+        break;
+	
 	}
 
-	return RES_PARERR;
+	return res;
 }
+
 #endif
 
 
@@ -202,29 +171,46 @@ DRESULT disk_ioctl (
 	void *buff		/* Buffer to send/receive control data */
 )
 {
-	DRESULT res;
-	int result;
+	DRESULT res = RES_PARERR;
+	//int result;
 
 	switch (pdrv) {
 	case ATA :
+		/*SD CARD*/
+		      break;
 
-		// Process of the command for the ATA drive
-
-		return res;
-
-	case MMC :
-
-		// Process of the command for the MMC/SD card
-
-		return res;
-
-	case USB :
-
-		// Process of the command the USB drive
-
-		return res;
+	case SPI_FLASH :
+        switch(cmd)
+        {
+            case GET_SECTOR_COUNT:
+                *(DWORD *) buff = 512;
+                break;
+            case GET_SECTOR_SIZE:
+                *(DWORD *) buff = 4096;
+                break;
+            case GET_BLOCK_SIZE:
+                *(DWORD *) buff = 1;
+                break;
+        }
+        res = RES_OK;
+        break;
+		
+    default:
+        res = RES_PARERR;
+        break;
+	
 	}
+	return res;
 
-	return RES_PARERR;
 }
 #endif
+
+__weak DWORD get_fattime(void)
+{
+    return ((DWORD)(2020 - 1980) << 25)     //YEAR
+                    | ((DWORD)12 << 21)      //MONTH
+                    | ((DWORD)20 << 16)     //DAY
+                    | ((DWORD)7 << 11)     //HOUR
+                    | ((DWORD)20 << 5)     //MINUTE
+                    | ((DWORD)30 << 1);     //SECOND
+}
